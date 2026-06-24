@@ -266,10 +266,11 @@ def main(input_path, output_path):
             traceback.print_exc()
             print(f"ERROR: {e}")
 
-
+#ultimate
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("inputfolder", help="Input File")
     parser.add_argument("outputfolder", help="Output File")
     args = parser.parse_args()
+    main(args.inputfolder, args.outputfolder)
     main(args.inputfolder, args.outputfolder)
