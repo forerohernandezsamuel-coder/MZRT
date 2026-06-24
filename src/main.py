@@ -273,4 +273,3 @@ if __name__ == "__main__":
     parser.add_argument("outputfolder", help="Output File")
     args = parser.parse_args()
     main(args.inputfolder, args.outputfolder)
-    main(args.inputfolder, args.outputfolder)
