@@ -5,22 +5,32 @@ from train import *
 import os
 import pickle
 
+# ==============================================================================
+# CARGA GLOBAL ÚNICA DEL MODELO (Se ejecuta una sola vez al encender el servidor)
+# ==============================================================================
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(CURRENT_DIR, 'trained_models', 'nn_trained_model_hog.sav')
+
+if not os.path.exists(MODEL_PATH):
+    print('Please wait while training the NN-HOG model....')
+    # Nota: Asegúrate de tener importada la función train si se requiere aquí
+    train('NN', 'hog', 'nn_trained_model_hog')
+
+print("-> Loading ML Model into RAM memory once...")
+GLOBAL_MODEL = pickle.load(open(MODEL_PATH, 'rb'))
+# ==============================================================================
+
+
 def predict(img):
-    # 1. Obtenemos la ruta absoluta de la carpeta donde vive este archivo fit.py (src)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # 2. Construimos la ruta absoluta apuntando directamente al modelo .sav
-    model_path = os.path.join(current_dir, 'trained_models', 'nn_trained_model_hog.sav')
-
-    # 3. Validamos la existencia usando la ruta absoluta real
-    if not os.path.exists(model_path):
-        print('Please wait while training the NN-HOG model....')
-        train('NN', 'hog', 'nn_trained_model_hog')
-
-    # 4. Cargamos el modelo usando la ruta absoluta garantizada
-    model = pickle.load(open(model_path, 'rb'))
+    """
+    Función optimizada: Realiza la predicción usando el modelo que ya reside 
+    en la memoria RAM, eliminando las lecturas repetitivas de disco duro.
+    """
+    # Extraemos características de la imagen que entra
     features = extract_features(img, 'hog')
-    labels = model.predict([features])
+    
+    # Predecimos usando la referencia global en memoria
+    labels = GLOBAL_MODEL.predict([features])
 
     return labels
 
