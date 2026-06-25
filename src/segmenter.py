@@ -24,7 +24,7 @@ class Segmenter(object):
 
     def segment(self):
         self.line_indices = get_line_indices(histogram(self.bin_img, 0.8))
-        if len(self.line_indices) < 10:
+        if len(self.line_indices) < 5:  # Bajamos a 5 líneas mínimo por pentagrama
             self.regions_without_staff = [
                 np.copy(self.open_region(self.no_staff_img))]
             self.regions_with_staff = [np.copy(self.bin_img)]
@@ -38,7 +38,7 @@ class Segmenter(object):
 
         end_of_staff = []
         for index, line in enumerate(lines):
-            if index > 0 and (line[0][1] - end_of_staff[-1][1] < 4*self.spacing):
+            if index > 0 and (line[0][1] - end_of_staff[-1][1] < 2 * self.spacing):
                 pass
             else:
                 p1, p2 = line
@@ -46,33 +46,27 @@ class Segmenter(object):
                 x1, y1 = p2
                 end_of_staff.append((x0, y0, x1, y1))
 
-        box_centers = []
-        spacing_between_staff_blocks = []
-        for i in range(len(end_of_staff)-1):
-            spacing_between_staff_blocks.append(
-                end_of_staff[i+1][1] - end_of_staff[i][1])
-            if i % 2 == 0:
-                offset = (end_of_staff[i+1][1] - end_of_staff[i][1])//2
-                center = end_of_staff[i][1] + offset
-                box_centers.append((center, offset))
-
-        max_staff_dist = np.max(spacing_between_staff_blocks)
-        max_margin = max_staff_dist // 2
-        margin = max_staff_dist // 10
-
-        end_points = []
+        # --- REESTRUCTURACIÓN DE CORTES INDEPENDIENTES ---
+        # En lugar de saltar de 2 en 2 (i % 2 == 0), procesamos cada bloque de 5 líneas por separado
         regions_without_staff = []
         regions_with_staff = []
-        for index, (center, offset) in enumerate(box_centers):
-            y0 = int(center) - max_margin - offset + margin
-            y1 = int(center) + max_margin + offset - margin
-            end_points.append((y0, y1))
+        
+        # Definimos un margen vertical dinámico basado en el espaciado interno de las líneas
+        vertical_margin = int(2.5 * self.spacing)
 
+        for i in range(len(end_of_staff)):
+            # Determinamos el centro aproximado de este pentagrama individual
+            y_center = end_of_staff[i][1]
+            
+            # Calculamos límites superior e inferior protegiendo el espacio de notas agudas y graves
+            y0 = max(0, y_center - vertical_margin)
+            y1 = min(self.bin_img.shape[0], y_center + vertical_margin + int(2 * self.thickness))
+
+            # Extraemos la región horizontal completa para este pentagrama específico
             region = self.bin_img[y0:y1, 0:self.bin_img.shape[1]]
             regions_with_staff.append(region)
-            staff_block = self.no_staff_img[y0:y1,
-                                            0:self.no_staff_img.shape[1]]
-
+            
+            staff_block = self.no_staff_img[y0:y1, 0:self.no_staff_img.shape[1]]
             regions_without_staff.append(self.open_region(staff_block))
 
         self.regions_without_staff = regions_without_staff

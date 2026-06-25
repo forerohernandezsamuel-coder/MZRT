@@ -124,24 +124,34 @@ def coordinator(bin_img, horizontal):
     rle, vals = hv_rle(bin_img)
     most_common = get_most_common(rle)
     thickness, spacing = calculate_thickness_spacing(rle, most_common)
+    
+    # Ajustamos un porcentaje más alto y seguro para no borrar barras de corcheas
+    global row_percentage
+    row_percentage = 0.65  # Sube del 0.3 al 0.65 para proteger figuras musicales
+    
+    # Usamos el método de remoción geométrica por filas
+    no_staff_img = remove_staff_lines_2(thickness, bin_img)
+    
+    # Aislamos las líneas restando la imagen original de la limpia
+    staff_lines = otsu(bin_img - no_staff_img)
+    
+    # Proyección horizontal para encontrar la VERDADERA primera línea densa
+    # Esto evita que los números de digitación o las llaves rompan el 'start'
+    projected_rows = np.sum(staff_lines == 0, axis=1) # Contamos píxeles negros por fila
+    
+    # Buscamos la primera fila donde la densidad supere una parte significativa del ancho
     start = 0
-    if horizontal:
-        no_staff_img = remove_staff_lines_2(thickness, bin_img)
-        staff_lines = otsu(bin_img - no_staff_img)
+    for idx, val in enumerate(projected_rows):
+        if val > (bin_img.shape[1] * 0.4): # Umbral de densidad de línea real
+            start = idx
+            break
+            
+    # Si por alguna razón da 0, usamos el fallback geométrico
+    if start == 0:
         start = horizontal_projection(bin_img)
-    else:
-        no_staff_img = remove_staff_lines(rle, vals, thickness, bin_img.shape)
-        no_staff_img = binary_closing(
-            no_staff_img, np.ones((thickness+2, thickness+2)))
-        no_staff_img = median(no_staff_img)
-        no_staff_img = binary_opening(
-            no_staff_img, np.ones((thickness+2, thickness+2)))
-        staff_lines = otsu(bin_img - no_staff_img)
-        staff_lines = binary_erosion(
-            staff_lines, np.ones((thickness+2, thickness+2)))
-        staff_lines = median(staff_lines, selem=square(21))
-        start = get_staff_row_position(staff_lines)
-    staff_row_positions = get_rows(
-        start, most_common, thickness, spacing)
+        
+    # Reconstruimos las posiciones virtuales de referencia para las octavas
+    staff_row_positions = get_rows(start, most_common, thickness, spacing)
     staff_row_positions = [np.average(x) for x in staff_row_positions]
+    
     return spacing, staff_row_positions, no_staff_img

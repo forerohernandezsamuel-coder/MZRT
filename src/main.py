@@ -12,15 +12,16 @@ from scipy.ndimage import binary_fill_holes
 from skimage.morphology import thin
 import argparse
 
+# Organizado de arriba hacia abajo (en píxeles) desde la línea superior (Fa5)
 label_map = {
-    0: {0: 'N0'},
-    1: {0: 'b2', 1: 'a2'},
-    2: {0: 'g2', 1: 'f2'},
-    3: {0: 'e2', 1: 'd2'},
-    4: {0: 'c2', 1: 'b1'},
-    5: {0: 'a1', 1: 'g1'},
-    6: {0: 'f1', 1: 'e1'},
-    7: {0: 'd1', 1: 'c1'}
+    0: {0: 'g5', 1: 'f5'},  # Espacio sobre el pentagrama / Quinta línea
+    1: {0: 'f5', 1: 'e5'},  # Quinta línea / Cuarto espacio
+    2: {0: 'd5', 1: 'c5'},  # Cuarta línea / Tercer espacio
+    3: {0: 'b4', 1: 'a4'},  # Tercera línea / Segundo espacio
+    4: {0: 'g4', 1: 'f4'},  # Segunda línea / Primer espacio
+    5: {0: 'e4', 1: 'd4'},  # Primera línea / Espacio inferior (Re4)
+    6: {0: 'c4', 1: 'b3'},  # Línea adicional inferior (Do4 / Si3)
+    7: {0: 'a3', 1: 'g3'}   # Notas graves por fuera del pentagrama
 }
 
 note_map = {
@@ -72,13 +73,20 @@ def guido_to_readable(note_guido):
 def estim(c, idx, imgs_spacing, imgs_rows):
     spacing = imgs_spacing[idx]
     rows = imgs_rows[idx]
-    margin = 1+(spacing/4)
+    margin = 1 + (spacing / 4)
+    
+    # Recorremos las líneas virtuales del pentagrama
     for index, line in enumerate(rows):
-        if c >= line - margin and c <= line + margin:
-            return index+1, 0
-        elif c >= line + margin and c <= line + 3*margin:
-            return index+1, 1
-    return 7, 1
+        # Si el centro de la nota cae directamente sobre la línea
+        if line - margin <= c <= line + margin:
+            return index + 1, 0
+        # Si el centro cae en el espacio inmediatamente inferior a esa línea
+        elif line + margin < c <= line + 3 * margin:
+            return index + 1, 1
+            
+    # Caso por defecto si la nota está muy arriba o abajo: 
+    # Mapea a una zona intermedia segura (Sol4 en la segunda línea) en lugar de colapsar a Do1
+    return 4, 0
 
 
 def get_note_name(prev, octave, duration):
@@ -129,8 +137,9 @@ def recognize(out_file, most_common, coord_imgs, imgs_with_staff, imgs_spacing, 
     simple_black = ['a_4', 'a_8', 'a_16', 'a_32', '4', '8', '16', '32',
                     '8_b_r', '8_b_n', '16_b_r', '16_b_n', '32_b_r', '32_b_n']
     disk_size = most_common / 2
-    if len(coord_imgs) > 1:
-        out_file.write("{\n")
+    # --- BLOQUE DE ESCRITURA LIMPIO PARA LA APP ---
+    todas_las_notas = []
+
     for i, img in enumerate(coord_imgs):
         res = []
         prev = ''
@@ -216,17 +225,17 @@ def recognize(out_file, most_common, coord_imgs, imgs_with_staff, imgs_spacing, 
             if label not in ['flat', 'flat_b', 'cross', '#', '#_b']:
                 prev = ''
 
-        out_file.write("=== Pentagrama {} ===\n".format(i+1))
+        # En lugar de escribir en el archivo con formatos raros, acumulamos las notas legibles
         for note in res:
             if type(note) == list:
+                # Si es un acorde, unimos las notas internas con comas
                 chord_str = ", ".join([guido_to_readable(n) for n in note])
-                out_file.write("[ {} ]\n".format(chord_str))
+                todas_las_notas.append(chord_str)
             else:
-                out_file.write(guido_to_readable(note) + "\n")
-        out_file.write("\n")
+                todas_las_notas.append(guido_to_readable(note))
 
-    if len(coord_imgs) > 1:
-        out_file.write("}")
+    # Guardamos todo en una sola línea separado por espacios simples
+    out_file.write(" ".join(todas_las_notas))
     print("###########################", res, "##########################")
 
 
